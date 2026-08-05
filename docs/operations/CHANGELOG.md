@@ -19,3 +19,29 @@ the people using the thing.
 ```
 
 ## Unreleased
+
+## 2026-08-05 — DOMO MCP production foundation
+
+**Shipped:** Deployed the four-tool DOMO MCP server at
+`domo-mcp.abush.workers.dev` behind Cloudflare Access with Entra ID, backed by
+the live Domo dataset and a migrated D1 query log with real user attribution.
+
+**Verified:** Streamable HTTP initialization succeeds; `tools/list` returns
+exactly four tools; `run_sql` returns live rows with `at_limit` and
+`column_types`; `data_boundary` returned invoice dates 2021-01-04 through
+2026-08-05, record dates 2020-10-22 through 2026-08-04, 18,648 total rows, and
+zero null invoice dates; `get_query_reference` returned all 23,683 bytes.
+Unauthenticated requests are rejected (401 before Access, 302 login redirect
+after Access).
+
+**Changed:** GitHub Actions now deploys on pushes to `main`; the D1 database,
+Domo secrets, Zero Trust organization, Entra identity provider, Access policy,
+and production Access audience are configured.
+
+**Known limitation:** The service is deployed but is not yet reachable by any
+MCP client because browser-mode Access returns an HTML login redirect to
+non-browser clients.
+
+**Rollback:** Revert the DOMO MCP deployment commits and redeploy; do not remove
+the legacy `domo-chatgpt-proxy`, which remains the active Product Operations
+path until cutover.
