@@ -12,15 +12,7 @@ Delivery lines (class IN ('DEL-LAND','DEL-SPOR','DELIVERY')) must be excluded fr
 Call get_query_reference before composing any query involving columns or filters not covered above.
 Every query must end with an explicit LIMIT of 5000 or fewer.`;
 
-const DATA_BOUNDARY_SQL = `SELECT
-  MIN(invdate) AS min_invdate,
-  MAX(invdate) AS max_invdate,
-  MIN(date) AS min_date,
-  MAX(date) AS max_date,
-  COUNT(*) AS total_row_count,
-  SUM(CASE WHEN invdate IS NULL THEN 1 ELSE 0 END) AS null_invdate_count
-FROM table
-LIMIT 1`;
+const DATA_BOUNDARY_SQL = "SELECT MIN(invdate) AS min_invdate, MAX(invdate) AS max_invdate, MIN(date) AS min_date, MAX(date) AS max_date, COUNT(*) AS total_row_count, SUM(CASE WHEN invdate IS NULL THEN 1 ELSE 0 END) AS null_invdate_count FROM table LIMIT 1";
 
 const DESCRIBE_SCHEMA_SQL = "SELECT * FROM table LIMIT 1";
 

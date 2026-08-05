@@ -71,9 +71,10 @@ export async function queryDomo(env: Env, sql: string): Promise<DomoQueryRespons
 }
 
 function execute(env: Env, token: string, sql: string): Promise<Response> {
+  const normalizedSql = sql.trim().replace(/\s+/g, " ");
   return fetch(`${DOMO_API_BASE}/v1/datasets/query/execute/${env.DOMO_DATASET_ID}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ sql }),
+    body: JSON.stringify({ sql: normalizedSql }),
   });
 }

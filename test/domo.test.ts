@@ -41,3 +41,40 @@ test("Domo token uses documented GET data scope and is cached across queries", a
     clearCachedToken();
   }
 });
+
+test("Domo egress collapses multiline SQL before sending it", async () => {
+  clearCachedToken();
+  let outboundSql: unknown;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    if (String(input).includes("/oauth/token")) {
+      return Response.json({ access_token: "token", expires_in: 3599 });
+    }
+    outboundSql = JSON.parse(String(init?.body)).sql;
+    return Response.json({
+      datasource: "dataset",
+      device: "node",
+      columns: ["value"],
+      metadata: [{ type: "DOUBLE" }],
+      fromcache: "false",
+      numColumns: 1,
+      rows: [[1]],
+      numRows: 1,
+      duration: "5",
+    });
+  };
+  try {
+    await queryDomo(
+      testEnv(),
+      `SELECT
+        MIN(invdate),
+        MAX(invdate)
+      FROM table
+      LIMIT 1`,
+    );
+    assert.equal(outboundSql, "SELECT MIN(invdate), MAX(invdate) FROM table LIMIT 1");
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearCachedToken();
+  }
+});
