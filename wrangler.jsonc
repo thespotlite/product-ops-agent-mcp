@@ -20,10 +20,10 @@
     }
   ],
   "d1_databases": [
-    {
-      "binding": "QUERY_LOG",
-      "database_name": "domo-query-log",
-      "database_id": "TODO"
-    }
-  ]
+  {
+    "binding": "QUERY_LOG",
+    "database_name": "domo-query-log",
+    "database_id": "71f6356c-6ec9-40c7-90d8-b2a431c437fe"
+  }
+]
 }
