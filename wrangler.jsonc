@@ -4,14 +4,18 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-08-05",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "motz-it.cloudflareaccess.com",
+    "ACCESS_AUD": "TODO: from the domo-mcp Access application, created after first deploy"
+  },
+  "upload_source_maps": true,
   "observability": {
-    "enabled": true,
-    "upload_source_maps": true
+    "enabled": true
   },
   "rules": [
     {
       "type": "Text",
-      "globs": ["reference/*.md"],
+      "globs": ["../reference/*.md"],
       "fallthrough": true
     }
   ],

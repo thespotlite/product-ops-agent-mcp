@@ -14,25 +14,28 @@ export type ValidationResult =
   | { ok: false; message: string; rejectedBy: RejectionRule };
 
 export function validateSql(input: string): ValidationResult {
-  const sql = input.trim().replace(/\s+/g, " ");
+  const normalized = input.trim().replace(/\s+/g, " ");
 
-  if (sql.length > 8000) {
+  if (normalized.length > 8000) {
     return { ok: false, message: "Query must be 8000 characters or fewer.", rejectedBy: "length" };
   }
-  if (sql.includes(";")) {
+  if (input.includes(";")) {
     return { ok: false, message: "Semicolons are not allowed. Submit one SELECT query without a trailing semicolon.", rejectedBy: "semicolon" };
   }
-  if (sql.includes("--") || sql.includes("/*")) {
+  if (input.includes("--") || input.includes("/*")) {
     return { ok: false, message: "SQL comments are not allowed.", rejectedBy: "comment" };
   }
-  if (!/^(SELECT|WITH)\b/i.test(sql)) {
+  if (!/^(SELECT|WITH)\b/i.test(normalized)) {
     return { ok: false, message: "Query must begin with SELECT or WITH.", rejectedBy: "statement_type" };
   }
-  const forbidden = sql.match(/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|REPLACE|MERGE|INTO)\b/i);
+  const withoutStringLiterals = normalized.replace(/'(?:''|[^'])*'/g, "''");
+  const forbidden = withoutStringLiterals.match(
+    /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|MERGE|INTO)\b/i,
+  );
   if (forbidden) {
     return { ok: false, message: `Read-only queries cannot contain ${forbidden[1].toUpperCase()}.`, rejectedBy: "forbidden_keyword" };
   }
-  const limitMatch = sql.match(/\bLIMIT\s+(\d+)\s*$/i);
+  const limitMatch = normalized.match(/\bLIMIT\s+(\d+)\s*$/i);
   if (!limitMatch) {
     return { ok: false, message: LIMIT_ERROR, rejectedBy: "limit" };
   }
@@ -41,5 +44,5 @@ export function validateSql(input: string): ValidationResult {
     return { ok: false, message: LIMIT_ERROR, rejectedBy: "limit" };
   }
 
-  return { ok: true, sql, limit };
+  return { ok: true, sql: input, limit };
 }

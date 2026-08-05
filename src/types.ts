@@ -2,6 +2,8 @@ export interface Env {
   DOMO_CLIENT_ID: string;
   DOMO_CLIENT_SECRET: string;
   DOMO_DATASET_ID: string;
+  ACCESS_TEAM_DOMAIN: string;
+  ACCESS_AUD: string;
   QUERY_LOG: D1Database;
 }
 

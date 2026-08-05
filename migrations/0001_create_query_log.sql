@@ -5,6 +5,8 @@ CREATE TABLE query_log (
   tool_name TEXT NOT NULL,
   sql_text TEXT,
   row_count INTEGER,
+  requested_limit INTEGER,
+  at_limit INTEGER CHECK (at_limit IN (0, 1)),
   duration_ms REAL,
   from_cache TEXT,
   error TEXT,

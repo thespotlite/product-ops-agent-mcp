@@ -158,3 +158,7 @@ Two carried in from data profiling that will bite whoever writes a query by hand
   placeholder, and it is Domo's API convention.
 - Domo serializes `fromcache` and `duration` as strings while numerics come back
   as real JSON numbers. Do not add blanket string coercion.
+  - The wrangler Text rule glob is `../reference/*.md`, not `reference/*.md`.
+  Wrangler resolves static-import rules relative to `src/index.ts`, so the
+  repo-root-relative path fails with "No loader is configured for .md". This
+  silently couples the glob to `main` staying at src/index.ts.
