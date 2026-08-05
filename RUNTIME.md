@@ -1,124 +1,160 @@
-# AGENTS.md
+# RUNTIME.md — DOMO MCP
 
-How AI agents coordinate on this repo. The model is **flexible** by
-design — you can run two agents in lanes or one agent end-to-end, and
-this file tells you how to do either cleanly.
+> Runtime facts for this repo. The governance docs reference this file rather
+> than naming a stack. Change this file, not the doctrine.
 
-## Read first
-1. `RUNTIME.md` — this repo's stack, commands, high-risk paths, contracts
-2. `CLAUDE.md` — repo law, architecture boundaries, review standard
-3. `CODEX.md` — implementer role and operating rules
-4. `docs/ENGINEERING_PRINCIPLES.md` — anti-duplication, security, testing doctrine
-5. `docs/CODING_STANDARDS.md`
-6. `docs/operations/HANDOFF.md` — current state + next step
+---
 
-## Default roles
-- **Claude Code** — planner, architect, reviewer. Translates goals
-  into scoped plans, decides what's release-blocking, reviews
-  Codex's output.
-- **Codex** — implementer. Makes the approved, scoped change. Runs
-  the checks. Reports exactly what changed.
+## Stack
 
-These are starting roles, not hard assignments. The human can:
-- Run Claude solo end-to-end (planning + implementation in one agent)
-- Run Codex solo on a tightly-scoped change with no planning gate
-- Split work between them in lanes when both are present
+| Field | Value |
+|---|---|
+| Runtime | Cloudflare Worker, Streamable HTTP MCP server |
+| Package manager | `npm` |
+| Language | TypeScript |
+| Data store | Cloudflare D1, query log only. Domo is upstream and read-only over its API |
+| Auth | Cloudflare Access for SaaS, Entra ID as identity provider |
+| Deploy | GitHub Action, `cloudflare/wrangler-action@v3` |
+| Secrets live in | `wrangler secret put`. Three: `DOMO_CLIENT_ID`, `DOMO_CLIENT_SECRET`, `DOMO_DATASET_ID` |
 
-The choice is **per-session**, not permanent.
+Consumers: a Claude Project used by Product Operations, via a custom connector
+registered at the Claude organization level.
 
-## Universal rules
+---
 
-1. **Human decisions override AI preferences.** Always.
-2. **When scope is unclear, stop and ask.** Don't infer approval from
-   silence.
-3. **Keep changes scoped and reversible.**
-4. **Handoffs happen at commit boundaries** — not mid-edit.
-5. **No agent works from another agent's raw audit dump.** Work from
-   `docs/operations/APPROVED_FIX_LIST.md` and documented decisions.
-6. **Do not touch anything in `RUNTIME.md` § Correctness contracts outside an
-   explicitly scoped task.** Those behaviors are depended on by something
-   outside this repo and they look like local style inconsistencies from the
-   inside. Normalizing one is the most likely way to break production with
-   every check still green.
-7. **Any new scheduled job ships with failure detection** or an explicit note
-   in the handoff explaining why it has none.
+## Verify commands
 
-## Execution modes
+```
+npm run type-check
+npx oxlint
+npx wrangler deploy --dry-run
+```
 
-Pick a mode at the start of a session and record it in
-`docs/operations/HANDOFF.md`. Default is sequential.
+`type-check` must pass on a clean checkout with no generate or build step first.
+There is no code generation in this repo, deliberately.
 
-### Sequential (default)
-One agent edits at a time. Use for:
-- Shared-state work (schema, auth, env config)
-- Small scoped tasks where parallelism just adds overhead
-- Any session where file boundaries are unclear
+**Narrower scope, narrower claim.** State exactly what you ran and what you did
+not. Never report "all checks passed" on a subset.
 
-### Parallel-isolated
-Two agents working on declared, non-overlapping file sets. Use for:
-- Independent feature work (Codex implements an API route while you
-  audit a different surface)
-- Audit + implementation on separate areas of the codebase
+---
 
-Rules when in this mode:
-- Claude (or the human) declares file boundaries before work starts
-- Each agent's file set is listed in `HANDOFF.md` under "Active lanes"
-- No agent crosses into another's declared files
-- If an agent discovers a need to touch files outside its lane, it
-  stops and surfaces the dependency
-- Merge happens at a coordination checkpoint, not ad hoc
+## Correctness contracts
 
-### Serialized-critical
-Forced single-agent mode for high-risk surfaces. The path list is per repo, in
-`RUNTIME.md` § High-risk paths. It should always include:
-- auth, authorization, and env or secrets access
-- schema and migrations
-- the audit or guard tests themselves
-- `.github/`
-- anything in `RUNTIME.md` § Correctness contracts
-- anything listed under "Do not touch without approval" in `HANDOFF.md`
+Four. The last two are unusual in that the contract is prose living inside code,
+which makes them likelier than average to get "tidied."
 
-## Conflict resolution
+| Contract | Where | Why it is load-bearing | Enforced by |
+|---|---|---|---|
+| A result exceeding the row cap **errors**, never truncates | `run_sql` validation | A silently truncated result produces a confidently wrong total that nobody downstream can detect | Acceptance criteria 7 and 8; guard test |
+| `at_limit` is true only when `numRows` equals the requested `LIMIT` | `run_sql` response mapping | A field that is always one value carries no information. This contract replaced exactly that bug | Acceptance criterion 9, which requires proving both directions |
+| The `run_sql` tool description states the three-class delivery exclusion, the `table` alias, the double-quoting rule, and that extended price and cost are computed | `run_sql` tool registration | Tool descriptions are always in the model's context; fetchable reference is only advisory. Shorten this and every product revenue answer silently starts including freight | Guard test asserting the description contains each rule |
+| `get_query_reference` returns `reference/DOMO_Reference.md` in full | `get_query_reference` | Truncating or summarizing it for token efficiency silently removes the column dictionary and the unit-of-measure warnings | Acceptance criterion 11, which checks the file's last line is present |
 
-- Human > Claude > Codex.
-- If two agents disagree, Claude arbitrates. If Claude is one of the
-  disagreeing parties, the human decides.
-- If an agent finds a contradiction between docs, `AGENTS.md` and
-  `CLAUDE.md` win. Flag the contradiction in your report.
+Do not change any of these outside an explicitly scoped task. If you think one is
+wrong, say so in your report and let the human decide.
 
-## Findings labels
+---
 
-When auditing or surfacing issues, tag every finding:
+## High-risk paths
 
-- **confirmed** — verified, evidence provided
-- **disputed** — disagreement exists, needs human decision
-- **manual-only** — cannot be verified by AI, requires human action
-- **noise** — not a real issue, rejected with reason
+Serialized-critical. Single agent, no parallel lanes, regardless of the mode in
+`docs/operations/HANDOFF.md`.
 
-These tags propagate to `docs/operations/APPROVED_FIX_LIST.md`.
+```
+src/domo.ts            token handling, dataset ID, the only Domo egress
+src/validation.ts      SELECT-only gate, statement rules, row cap
+src/tools.ts           tool registration and descriptions (see contracts above)
+wrangler.jsonc         bindings, the reference/*.md Text rule, compatibility date
+migrations/            D1 schema for the query log
+.github/               CI and deploy
+```
 
-## Recommended sequence (default flow)
+`reference/DOMO_Reference.md` is not serialized-critical, since it is expected to
+change as the data is better understood. But it directly steers model output, so
+every change needs human review. It is not a scratch file.
 
-1. Human or Claude defines scope and chooses execution mode
-2. Claude writes the scoped plan
-3. If parallel-isolated, Claude declares lanes in `HANDOFF.md`
-4. Codex implements
-5. Coordination checkpoint: Claude reviews output before next phase
-6. Human signs off
-7. Update `CHANGELOG.md` and `HANDOFF.md`
+---
 
-## Solo-Claude flow
+## Architecture boundaries
 
-When Claude runs solo end-to-end:
+| Boundary | Rule | Enforced by |
+|---|---|---|
+| Single Domo egress | Exactly one module holds the token, the dataset ID, and the fetch to `api.domo.com`. Nothing else calls out | Guard test: no `api.domo.com` literal outside that module |
+| Validation precedes egress | No code path reaches Domo without passing the full validation gate | Guard test on call ordering |
+| The query log is not a tool | No MCP tool reads, lists, or summarizes D1. Operator reads it out of band | Guard test: no D1 binding reference inside tool handlers |
+| Results never persist | Query result rows are never written to D1 or anywhere else. Row counts only | Guard test: no `rows` reference in the logging path |
+| Secrets via bindings only | No `process.env`, no literals. Env bindings only | oxlint rule plus review |
+| Stateless transport | `createMcpHandler`. No Durable Object, no `migrations` block for a DO class | Guard test: no `McpAgent` import; convention for the config |
 
-1. Write the scoped plan inline
-2. Implement against the plan
-3. Run the full verification set from `RUNTIME.md` § Verify commands, plus any
-   structural audits if a guard rule was touched
-4. Self-review using the `CLAUDE.md` § Review standard
-5. Update docs as required
-6. Update `HANDOFF.md` and `CHANGELOG.md`
+---
 
-The discipline is the same — the difference is only that you're doing
-both halves yourself, so the temptation to skip the review pass goes
-up. Don't skip it.
+## Schema and migration flow
+
+D1, and only for the query log. Domo's schema is upstream and not ours to change.
+
+```
+1. Edit the checked-in SQL in migrations/
+2. npx wrangler d1 migrations apply <db> --local   (verify)
+3. npx wrangler d1 migrations apply <db> --remote  (human runs this)
+4. Commit the migration file in the same PR as any code depending on it
+```
+
+Destructive operations are hand-written. There is no generator here, which
+removes the generated-noise problem entirely.
+
+---
+
+## Data classification bindings
+
+| Tier | Where it may live in this repo | Who may read it |
+|---|---|---|
+| Public | Tool names and descriptions, README | Anyone |
+| Internal | Column dictionary and query patterns in `reference/DOMO_Reference.md` | Authenticated users |
+| Confidential | Everything returned by `run_sql`. Customer names, unit cost, per-line margin. Also the entire D1 query log | Product Ops and IT, via the Access policy |
+| Restricted | The three Domo secrets | Operators only |
+
+Note the whole point of this service is to move Confidential data into a chat
+context. That is the accepted design, and the compensating control is the Access
+policy plus a scoped connector, not the absence of exposure.
+
+### Recorded exceptions
+
+| Rule broken | Where | Why | Compensating control |
+|---|---|---|---|
+| `DATA_CLASSIFICATION.md` rule 2, Confidential data never appears in logs | D1 `query_log.sql_text` | Queries routinely read `WHERE cusname = '<customer>'`. Redacting literals would destroy the only value the log has, which is seeing what people actually filtered on so Phase 2 tools can be designed from evidence rather than guesswork | Log classified Confidential, operator access only, exposed by no tool. Result rows never logged, counts only. Decision confirmed by the human, not inherited silently |
+
+---
+
+## Monitoring
+
+**Honest gap. Do not treat this table as complete.**
+
+| Field | Value |
+|---|---|
+| Monitored surface | None yet |
+| Monitor / pager | None yet |
+| Where monitors are declared | n/a |
+| Scheduled jobs + heartbeats | No scheduled jobs |
+
+Per `docs/MONITORING.md`, a service Product Ops depends on with no failure
+detection is not finished. Nothing here is scheduled, so there is no silent-stop
+risk, but a Domo credential expiry or an Access misconfiguration would surface as
+"Claude says the tool is broken" rather than as an alert.
+
+`observability.enabled` is on in `wrangler.jsonc`, which gives logs, not alerts.
+
+Deferred deliberately until the connector is working end to end. Logged in
+`docs/operations/BACKLOG.md` so it is a decision rather than an oversight.
+
+---
+
+## Known gotchas
+
+Empty on purpose. Log them the first time they bite.
+
+Two carried in from data profiling that will bite whoever writes a query by hand:
+
+- Domo aliases the dataset as `table`. That is the actual table name, not a
+  placeholder, and it is Domo's API convention.
+- Domo serializes `fromcache` and `duration` as strings while numerics come back
+  as real JSON numbers. Do not add blanket string coercion.

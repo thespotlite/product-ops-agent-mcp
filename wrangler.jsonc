@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "domo-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "upload_source_maps": true
+  },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["reference/*.md"],
+      "fallthrough": true
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "QUERY_LOG",
+      "database_name": "domo-query-log",
+      "database_id": "TODO"
+    }
+  ]
+}

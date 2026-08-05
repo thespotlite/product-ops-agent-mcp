@@ -1,0 +1,28 @@
+{
+  "name": "domo-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint .",
+    "test": "node --import tsx --test test/*.test.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.0.0-beta.5",
+    "agents": "0.20.0",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20260724.0",
+    "oxfmt": "0.17.2",
+    "oxlint": "1.36.0",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "wrangler": "4.45.0"
+  }
+}
