@@ -14,15 +14,15 @@
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.0.0-beta.5",
-    "agents": "0.20.0",
-    "zod": "4.3.6"
+    "agents": "0.20.1",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "4.20260724.0",
-    "oxfmt": "0.17.2",
-    "oxlint": "1.36.0",
-    "tsx": "4.20.6",
+    "oxfmt": "0.61.0",
+    "oxlint": "1.76.0",
+    "tsx": "4.23.4",
     "typescript": "5.9.3",
-    "wrangler": "4.45.0"
+    "wrangler": "4.118.0"
   }
 }
