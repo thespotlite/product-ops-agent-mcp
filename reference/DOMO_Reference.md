@@ -396,6 +396,73 @@ Everything else is unquoted: `quotenum`, `cusname`, `date`, `invdate`, `qty`, `p
 
 ---
 
+## 7b. Customer identity
+
+**`cusname` is an account name, not a customer.** The same commercial relationship
+appears under multiple `cusname` values, and `"Parent Company"` is what ties them
+together.
+
+Worked example, all-time product revenue:
+
+| cusname | Parent Company | Orders | Revenue |
+|---|---|---|---|
+| Synthetic Grass Warehouse | Tencate | 1,132 | $10.20M |
+| Challenger Turf, Inc. | Tencate | 700 | $5.60M |
+| California Turf Warehouse, Inc | Tencate | 22 | $190.6K |
+| Synthetic Lawns & Golf, Inc | Tencate | 21 | $100.3K |
+| SGW Fresno | Tencate | 7 | $61.2K |
+| Synthetic Greens Warehouse FL | Tencate | 5 | $47.7K |
+| Nevada Artificial Grass | Tencate | 3 | $24.0K |
+| Tiger Turf New Zealand Ltd | Tencate | 1 | $9.5K |
+
+Tencate totals $16.23M across 1,891 orders. Reported on `cusname`, the largest
+single row is $10.20M. Any "top customer" ranking built on `cusname` understates
+grouped accounts and is wrong at the relationship level.
+
+State which level you used. "Synthetic Grass Warehouse, $10.2M as a single
+account" and "Tencate, $16.2M across eight accounts" are both defensible and mean
+different things. Ask if the question turns on it.
+
+### `"Parent Company"` has a catch-all bucket
+
+The value `Other` is assigned to independent accounts with no group affiliation.
+It is not a company. A bare `GROUP BY "Parent Company"` therefore produces a fake
+top customer called `Other` aggregating unrelated businesses.
+
+Treat `Other` the way you treat a null grouping value: report it as
+unaffiliated, never as an entity. When rolling up by parent, either exclude
+`Other` and report those accounts individually, or label the bucket explicitly.
+
+### Name matching is unreliable
+
+Searching `cusname LIKE '%Synthetic%'` returns 20 rows, of which 16 are unrelated
+companies that merely share the word. Filter candidates by `"Parent Company"`
+before concluding two names are the same customer.
+
+There is no systematic abbreviation convention. `LIKE '%SGW%'` matches exactly one
+row, so `SGW Fresno` is an anomaly rather than evidence of an `SGW <City>` naming
+pattern.
+
+### Locations are delivery cities, not customers
+
+A regional branch is usually the same `cusname` distinguished by
+`"Delivery City"` and `"Delivery State"`, not a separate account. "SGW Anaheim" is
+`cusname = 'Synthetic Grass Warehouse'` filtered to Anaheim, CA.
+
+Before reporting that a customer or location is absent, search widely: partial
+`LIKE` on both the abbreviation and its expansion, `"Parent Company"`, and the
+delivery city and state fields. Then say what you did find and how it relates. "No
+exact match for X, but Y appears to be the same account" is useful. "X does not
+exist" is a claim that usually cannot be supported from this data.
+
+### Text fields are not case-normalized
+
+`"Delivery City"` contains both `Anaheim` and `ANAHEIM`. Any equality filter or
+`GROUP BY` on a text field will silently split one value into several. Use
+`UPPER()` on both sides, and expect the same hazard on any other free-text column.
+
+---
+
 ## 8. Known data quirks
 
 **`qty` is not one unit of measure.** This is the most dangerous quirk in the dataset
@@ -438,6 +505,12 @@ correct, but do not describe such a period as complete order activity.
 
 **One order, many rows.** Every aggregate over orders needs `COUNT(DISTINCT quotenum)`.
 `COUNT(*)` counts line items and will overstate order volume roughly two to one.
+
+**A class filter changes what an order count means.** `COUNT(DISTINCT quotenum)`
+under the product-revenue filter counts orders containing at least one product
+line, silently excluding delivery-only orders. For a question about how many
+orders a customer placed, apply no class filter. Reserve the product filter for
+revenue and margin. Say which you used when the distinction could matter.
 
 ---
 
@@ -584,6 +657,10 @@ listed here so they are recognized and rejected if they resurface:
 - "ENVIRO $61M, 72% of revenue." The 72% was computed against total billed with no
   delivery exclusion, confirming every headline figure in that file measured something
   different from what its own rules defined.
+- "Top customer: Synthetic Grass Warehouse, $10.5M." Computed on `cusname`, which
+  is an account name rather than a customer. That account is one of eight under
+  parent Tencate, which totals $16.23M. The figure is not merely stale; the
+  grouping level was wrong. See section 7b.
 - "Landscape $11.6M, Sports $3.4M" for 2025. Both were delivery-inclusive, folding
   `DEL-LAND` into Landscape and `DEL-SPOR` into Sports, which is why they summed to
   $15.0M against a correct product total of $13.1M. The $13.1M headline itself was
