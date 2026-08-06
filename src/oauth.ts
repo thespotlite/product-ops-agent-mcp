@@ -1,5 +1,5 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import { AuthorizationError, type AuthRequest, type OAuthHelpers } from "@cloudflare/workers-oauth-provider";
+import type { AuthRequest, OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 import { authenticatedEmail } from "./identity";
 import type { Env } from "./types";
 
@@ -50,6 +50,24 @@ function csrfCookie(token: string, maxAge: number): string {
   return `${CSRF_COOKIE}=${token}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=${maxAge}`;
 }
 
+function redirectResponse(location: string | URL, cookie?: string): Response {
+  const headers = new Headers({ Location: location.toString() });
+  if (cookie) headers.set("Set-Cookie", cookie);
+  return new Response(null, { status: 302, headers });
+}
+
+function isAuthorizationError(error: unknown): error is Error & {
+  code: string;
+  description: string;
+  redirectUri?: string;
+  state?: string;
+  issuer?: string;
+} {
+  if (!(error instanceof Error)) return false;
+  const candidate = error as unknown as Record<string, unknown>;
+  return typeof candidate.code === "string" && typeof candidate.description === "string";
+}
+
 function cookieValue(request: Request, name: string): string | undefined {
   return request.headers
     .get("Cookie")
@@ -72,7 +90,7 @@ async function storeAuthorization(env: OAuthEnv, request: AuthRequest): Promise<
   return { state, challenge };
 }
 
-function redirectToAccess(request: Request, env: OAuthEnv, state: string, challenge: string): Response {
+function redirectToAccess(request: Request, env: OAuthEnv, state: string, challenge: string, cookie?: string): Response {
   const url = new URL(env.ACCESS_AUTHORIZATION_URL);
   url.searchParams.set("client_id", env.ACCESS_CLIENT_ID);
   url.searchParams.set("redirect_uri", new URL("/callback", request.url).href);
@@ -81,7 +99,7 @@ function redirectToAccess(request: Request, env: OAuthEnv, state: string, challe
   url.searchParams.set("state", state);
   url.searchParams.set("code_challenge", challenge);
   url.searchParams.set("code_challenge_method", "S256");
-  return Response.redirect(url, 302);
+  return redirectResponse(url, cookie);
 }
 
 async function authorize(request: Request, env: OAuthEnv): Promise<Response> {
@@ -90,14 +108,14 @@ async function authorize(request: Request, env: OAuthEnv): Promise<Response> {
     try {
       oauthRequest = await env.OAUTH_PROVIDER.parseAuthRequest(request);
     } catch (error) {
-      if (!(error instanceof AuthorizationError)) throw error;
+      if (!isAuthorizationError(error)) throw error;
       if (!error.redirectUri) return new Response(error.description, { status: 400 });
       const redirect = new URL(error.redirectUri);
       redirect.searchParams.set("error", error.code);
       redirect.searchParams.set("error_description", error.description);
       if (error.state) redirect.searchParams.set("state", error.state);
       if (error.issuer) redirect.searchParams.set("iss", error.issuer);
-      return Response.redirect(redirect, 302);
+      return redirectResponse(redirect);
     }
     const client = await env.OAUTH_PROVIDER.lookupClient(oauthRequest.clientId);
     if (!client) return new Response("Unknown OAuth client", { status: 400 });
@@ -125,9 +143,7 @@ async function authorize(request: Request, env: OAuthEnv): Promise<Response> {
     if (!stored) return new Response("Authorization request expired", { status: 400 });
     const oauthRequest = JSON.parse(stored) as AuthRequest;
     const { state, challenge } = await storeAuthorization(env, oauthRequest);
-    const response = redirectToAccess(request, env, state, challenge);
-    response.headers.append("Set-Cookie", csrfCookie("", 0));
-    return response;
+    return redirectToAccess(request, env, state, challenge, csrfCookie("", 0));
   }
 
   return new Response("Method Not Allowed", { status: 405 });
@@ -177,7 +193,7 @@ async function callback(request: Request, env: OAuthEnv): Promise<Response> {
     scope: stored.request.scope,
     props: { email },
   });
-  return Response.redirect(redirectTo, 302);
+  return redirectResponse(redirectTo, csrfCookie("", 0));
 }
 
 export const oauthHandler: ExportedHandler<OAuthEnv> = {

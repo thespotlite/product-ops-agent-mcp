@@ -4,18 +4,17 @@
 
 ## Current state
 
-The OAuth auth pass is implemented and verified locally, but not deployed. The
+The OAuth auth pass is deployed, and the immutable redirect-header production
+bug in consent submission is fixed locally and awaiting deployment. The
 Worker now exposes OAuth 2.1 discovery, authorization, token, and registration
 endpoints; delegates user login to Cloudflare Access for SaaS; and carries the
-verified email through OAuth props into the D1 query log. The existing
-production deployment remains behind browser-mode Access and is unchanged.
+verified email through OAuth props into the D1 query log.
 
 ## Next step
 
-Human cutover work: create the Access for SaaS OIDC application and OAUTH_KV
-namespace, replace the `TODO` KV id in `wrangler.jsonc`, set all six new secrets,
-deploy, make the workers.dev hostname Public so it does not intercept the OAuth
-routes, and smoke with MCP Inspector before registering the Claude connector.
+Deploy the consent redirect fix, then repeat the full OAuth flow through MCP
+Inspector. Confirm consent POST and callback both redirect successfully before
+registering the Claude connector.
 
 ## Do not touch without approval
 
@@ -30,8 +29,13 @@ CSRF-protected approval screen, enables CIMD with
 
 Local verification proved unauthenticated `/mcp` returns 401 with an RFC 9728
 metadata challenge, and discovery advertises `/authorize`, `/token`, and
-`/register`. A real Access/Entra callback remains manual-only until the six
-secrets and SaaS application exist.
+`/register`. Production Access, Entra, KV, and secret configuration exist; the
+full live callback must be repeated after this fix is deployed.
+
+Production exposed that `Response.redirect()` headers are immutable in Workers.
+Consent POST attempted to append its cookie after constructing that response.
+Both cookie-plus-redirect paths now construct a new 302 with `Location` and
+`Set-Cookie` together, with regression tests covering consent and callback.
 
 The legacy `domo-chatgpt-proxy` Worker is still live, still Public, and still
 serving the ChatGPT GPT for Product Operations. Delete it at cutover, not
