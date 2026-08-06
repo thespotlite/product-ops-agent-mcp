@@ -3,11 +3,7 @@
   "name": "domo-mcp",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-05",
-  "compatibility_flags": ["nodejs_compat"],
-  "vars": {
-    "ACCESS_TEAM_DOMAIN": "motz-it.cloudflareaccess.com",
-    "ACCESS_AUD": "f48d25e7885bdbf4e86cef995b0df018d28931151143fdfee30b7048ed132732"
-  },
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "upload_source_maps": true,
   "observability": {
     "enabled": true
@@ -25,5 +21,11 @@
       "database_name": "domo-query-log",
       "database_id": "71f6356c-6ec9-40c7-90d8-b2a431c437fe"
     }
-  ]
+  ],
+"kv_namespaces": [
+  {
+    "binding": "OAUTH_KV",
+    "id": "9031eb402ffc4a028e886a4f4c7413f0"
+  }
+]
 }

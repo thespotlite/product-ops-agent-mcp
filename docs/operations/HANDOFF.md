@@ -4,30 +4,34 @@
 
 ## Current state
 
-The four-tool MCP server is deployed at `domo-mcp.abush.workers.dev` and
-verified end to end under browser-based Cloudflare Access with Entra ID. Live
-Domo queries, the full query reference, and attributed D1 logging work. The
-server is not reachable by Claude or another MCP client yet.
+The OAuth auth pass is implemented and verified locally, but not deployed. The
+Worker now exposes OAuth 2.1 discovery, authorization, token, and registration
+endpoints; delegates user login to Cloudflare Access for SaaS; and carries the
+verified email through OAuth props into the D1 query log. The existing
+production deployment remains behind browser-mode Access and is unchanged.
 
 ## Next step
 
-The auth pass. Browser-mode Access answers non-browser clients with a 302 to an
-HTML login page, confirmed by direct test, so an MCP client cannot authenticate.
-The Worker must become its own OAuth 2.1 authorization server using
-`@cloudflare/workers-oauth-provider`, with Cloudflare Access for SaaS as the
-upstream identity provider. Cloudflare documents this pattern at
-https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/secure-mcp-servers/.
-
-Scope: add the dependency, restructure `src/index.ts`, rewrite
-`src/identity.ts` away from `Cf-Access-Jwt-Assertion` header parsing, and use an
-Access for SaaS OIDC application plus two new secrets created by the human. Do
-not begin until the human provides a scoped spec.
+Human cutover work: create the Access for SaaS OIDC application and OAUTH_KV
+namespace, replace the `TODO` KV id in `wrangler.jsonc`, set all six new secrets,
+deploy, make the workers.dev hostname Public so it does not intercept the OAuth
+routes, and smoke with MCP Inspector before registering the Claude connector.
 
 ## Do not touch without approval
 
 Everything in RUNTIME.md § High-risk paths, plus reference/DOMO_Reference.md.
 
 ## Context the next session needs
+
+`@cloudflare/workers-oauth-provider` resolved to 0.10.1. Current library guidance
+requires explicit user consent and recommends CIMD, so the implementation has a
+CSRF-protected approval screen, enables CIMD with
+`global_fetch_strictly_public`, and retains `/register` for compatibility.
+
+Local verification proved unauthenticated `/mcp` returns 401 with an RFC 9728
+metadata challenge, and discovery advertises `/authorize`, `/token`, and
+`/register`. A real Access/Entra callback remains manual-only until the six
+secrets and SaaS application exist.
 
 The legacy `domo-chatgpt-proxy` Worker is still live, still Public, and still
 serving the ChatGPT GPT for Product Operations. Delete it at cutover, not

@@ -4,11 +4,11 @@ export interface TestContext extends ExecutionContext {
   pending: Promise<unknown>[];
 }
 
-export function testContext(): TestContext {
+export function testContext(props: Record<string, unknown> = {}): TestContext {
   const pending: Promise<unknown>[] = [];
   return {
     pending,
-    props: {},
+    props,
     passThroughOnException() {},
     waitUntil(promise: Promise<unknown>) {
       pending.push(promise);
@@ -24,13 +24,19 @@ export function testEnv(run: () => Promise<unknown> = async () => ({})): Env {
     run,
   };
   return {
-    ACCESS_AUD: "expected-aud",
-    ACCESS_TEAM_DOMAIN: "example.cloudflareaccess.com",
+    ACCESS_CLIENT_ID: "access-client",
+    ACCESS_CLIENT_SECRET: "access-secret",
+    ACCESS_TOKEN_URL: "https://example.cloudflareaccess.com/token",
+    ACCESS_AUTHORIZATION_URL: "https://example.cloudflareaccess.com/authorization",
+    ACCESS_JWKS_URL: "https://example.cloudflareaccess.com/jwks",
+    COOKIE_ENCRYPTION_KEY: "test-cookie-key",
     DOMO_CLIENT_ID: "test-client",
     DOMO_CLIENT_SECRET: "test-secret",
     DOMO_DATASET_ID: "test-dataset",
     QUERY_LOG: {
       prepare: () => statement,
     } as unknown as D1Database,
+    OAUTH_KV: {} as KVNamespace,
+    OAUTH_PROVIDER: {} as Env["OAUTH_PROVIDER"],
   };
 }

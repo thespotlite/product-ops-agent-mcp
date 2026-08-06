@@ -13,9 +13,9 @@
 | Package manager | `npm` |
 | Language | TypeScript |
 | Data store | Cloudflare D1, query log only. Domo is upstream and read-only over its API |
-| Auth | Cloudflare Access for SaaS, Entra ID as identity provider |
+| Auth | OAuth 2.1 provider for MCP clients; Cloudflare Access for SaaS OIDC upstream; Entra ID identity provider |
 | Deploy | GitHub Action, `cloudflare/wrangler-action@v3` |
-| Secrets live in | `wrangler secret put`. Three: `DOMO_CLIENT_ID`, `DOMO_CLIENT_SECRET`, `DOMO_DATASET_ID` |
+| Secrets live in | `wrangler secret put`. Nine: three `DOMO_*`, five `ACCESS_*`, and `COOKIE_ENCRYPTION_KEY` |
 
 Consumers: a Claude Project used by Product Operations, via a custom connector
 registered at the Claude organization level.
